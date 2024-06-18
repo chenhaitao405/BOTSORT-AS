@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_botsort_MainActivity_stringFromJNI(
         JNIEnv* env,

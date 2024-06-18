@@ -1,4 +1,3 @@
-#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -197,39 +196,6 @@ bool check_source(const std::string &source)
 int main(int argc, char **argv)
 {
 
-    // Command line arguments check
-    if (argc < 4)
-    {
-        std::cout << "Usage eg. 1: ./botsort_tracking_example <source> "
-                     "<dir_containing_per_frame_detections> "
-                     "<dir_to_save_mot_format_output>"
-                  << std::endl;
-        std::cout << "Usage eg. 2: ./botsort_tracking_example "
-                     "<tracker_config_path> "
-                     "<gmc_config_path> <reid_config_path> "
-                     "<reid_onnx_model_path> "
-                     "<source> <dir_containing_per_frame_detections> "
-                     "<dir_to_save_mot_format_output> <gt_file>"
-                  << std::endl;
-        return -1;
-    }
-    else if (4 < argc && argc < 8)
-    {
-        std::cout << "Usage eg. 1: ./botsort_tracking_example <source> "
-                     "<dir_containing_per_frame_detections> "
-                     "<dir_to_save_mot_format_output>"
-                  << std::endl;
-        std::cout << "Usage eg. 2: ./botsort_tracking_example "
-                     "<tracker_config_path> "
-                     "<gmc_config_path> <reid_config_path> "
-                     "<reid_onnx_model_path> "
-                     "<source> <dir_containing_per_frame_detections> "
-                     "<dir_to_save_mot_format_output> <gt_file>"
-                  << std::endl;
-        return -1;
-    }
-
-
     std::string tracker_config_path, gmc_config_path, reid_config_path,
             reid_onnx_model_path, source, labels_dir, output_dir, gt_filepath;
 
@@ -252,10 +218,6 @@ int main(int argc, char **argv)
 
 
     // Setup output directories
-    std::string output_dir_mot = output_dir + "/mot";
-    std::string output_dir_img = output_dir + "/img";
-    std::filesystem::create_directories(output_dir_mot);
-    std::filesystem::create_directories(output_dir_img);
 
 
 // // Initialize GlobalMotionCompensation
@@ -297,7 +259,6 @@ int main(int argc, char **argv)
     cv::VideoCapture cap;
     int frame_counter = 0;
     double tracker_time_sum = 0, tracker_time_total = 0;
-    std::string output_file_txt = output_dir_mot + "/all.txt";
     std::vector<std::string> image_filepaths;
     bool is_video = check_source(source);
 
@@ -323,69 +284,6 @@ int main(int argc, char **argv)
         std::cout <<source << "   cap isopen:" <<cap.isOpened()<< std::endl;
         cap.set(cv::CAP_PROP_POS_FRAMES, 0);
     }
-    else
-    {
-        // Read filenames in labels dir
-        for (const auto &entry: std::filesystem::directory_iterator(source))
-        {
-            image_filepaths.push_back(entry.path());
-        }
-        std::sort(image_filepaths.begin(), image_filepaths.end());
-    }
-
-
-#if (YOLOv8_PREDS == 1)
-    // Read detections and execute MultiObjectTracker
-    while (cap.read(frame) || frame_counter < image_filepaths.size())
-    {
-        std::string filename;
-
-        if (is_video)
-        {
-            std::ostringstream ss;
-            ss << std::setw(6) << std::setfill('0') << frame_counter;
-            filename = ss.str();
-        }
-        else
-        {
-            frame = cv::imread(image_filepaths[frame_counter]);
-            filename = image_filepaths[frame_counter].substr(
-                    image_filepaths[frame_counter].find_last_of('/') + 1);
-            filename = filename.substr(0, filename.find_last_of('.'));
-        }
-
-        std::string detection_file = labels_dir + "/" + filename + ".txt";
-        std::vector<Detection> detections = read_detections_from_file(
-                detection_file, frame.cols, frame.rows);
-        std::string output_file_img = output_dir_img + "/" + filename + ".jpg";
-
-        // Execute tracker
-        auto start = std::chrono::high_resolution_clock::now();
-        std::vector<std::shared_ptr<Track>> tracks =
-                tracker->track(detections, frame);
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        tracker_time_sum += elapsed.count();
-
-        // Outputs
-        mot_format_writer(tracks, output_file_txt);
-
-        plot_tracks(frame, detections, tracks);
-        cv::imwrite(output_file_img, frame);
-
-        frame_counter++;
-
-        if (frame_counter % 100 == 0)
-        {
-            std::cout << "Processed " << frame_counter << " frames\t";
-            std::cout << "Tracker FPS (last 100 frames): "
-                      << 100 / tracker_time_sum << std::endl;
-            tracker_time_total += tracker_time_sum;
-            tracker_time_sum = 0;
-        }
-    }
-#endif
-
 
 #if (GT_AS_PREDS == 1)
     std::vector<std::vector<Detection>> gt_per_frame =
@@ -409,7 +307,7 @@ int main(int argc, char **argv)
             filename = filename.substr(0, filename.find_last_of('.'));
         }
 
-        std::string output_file_img = output_dir_img + "/" + filename + ".jpg";
+
 
         // Execute tracker
         auto start = std::chrono::high_resolution_clock::now();
@@ -420,10 +318,9 @@ int main(int argc, char **argv)
         tracker_time_sum += elapsed.count();
 
         // Outputs
-        mot_format_writer(tracks, output_file_txt);
+
 
         plot_tracks(frame, gt_per_frame[frame_counter], tracks);
-        cv::imwrite(output_file_img, frame);
 
         frame_counter++;
 
